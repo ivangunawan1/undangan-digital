@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard — Undangan Digital</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../supabase-config.js"></script>
+  <style>
+    :root {
+      --bg:       #0D0F14;
+      --surface:  #161820;
+      --surface2: #1E2028;
+      --border:   rgba(255,255,255,0.07);
+      --gold:     #C9A84C;
+      --gold-dim: rgba(201,168,76,0.15);
+      --text:     #E8E6E0;
+      --text-dim: rgba(232,230,224,0.45);
+      --green:    #4CAF7D;
+      --red:      #E05252;
+      --blue:     #5B8DEF;
+      --font-d:   'DM Serif Display', serif;
+      --font-s:   'DM Sans', sans-serif;
+      --radius:   12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-s); font-size: 14px; min-height: 100vh; }
+
+    /* ── LOGIN ── */
+    #login-screen {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 40% 30%, rgba(201,168,76,0.06) 0%, transparent 60%);
+    }
+    .login-box {
+      width: 100%; max-width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+    .login-logo { font-family: var(--font-d); font-size: 1.5rem; color: var(--gold); margin-bottom: 0.3rem; }
+    .login-sub  { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 2rem; }
+    .form-field { margin-bottom: 1rem; text-align: left; }
+    .form-field label { display: block; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+    .form-field input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-family: var(--font-s); font-size: 0.9rem;
+      padding: 0.75rem 1rem; outline: none; transition: border-color 0.2s;
+    }
+    .form-field input:focus { border-color: var(--gold); }
+    .btn-primary {
+      width: 100%; background: var(--gold); color: #0D0F14; border: none;
+      border-radius: 8px; font-family: var(--font-s); font-size: 0.8rem; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase; padding: 0.85rem;
+      cursor: pointer; transition: opacity 0.2s; margin-top: 0.5rem;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .login-error { color: var(--red); font-size: 0.8rem; margin-top: 0.8rem; min-height: 1rem; }
+
+    /* ── LAYOUT ── */
+    #app { display: none; min-height: 100vh; }
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+      background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 1.5rem 1.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo h1 { font-family: var(--font-d); font-size: 1.1rem; color: var(--gold); }
+    .sidebar-logo p  { font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin-top: 0.2rem; }
+    .sidebar-nav { flex: 1; padding: 1rem 0; }
+    .nav-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.7rem 1.5rem; cursor: pointer; color: var(--text-dim);
+      font-size: 0.85rem; font-weight: 400; transition: all 0.2s;
+      border-left: 2px solid transparent;
+    }
+    .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-item.active { color: var(--gold); background: var(--gold-dim); border-left-color: var(--gold); }
+    .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+    .sidebar-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .admin-badge {
+      display: flex; align-items: center; gap: 0.6rem;
+      margin-bottom: 0.8rem;
+    }
+    .admin-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--gold); display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 600; color: #0D0F14; flex-shrink: 0;
+    }
+    .admin-info { flex: 1; min-width: 0; }
+    .admin-name { font-size: 0.75rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .admin-role { font-size: 0.65rem; color: var(--gold); }
+    .btn-logout {
+      width: 100%; background: transparent; border: 1px solid var(--border);
+      color: var(--text-dim); border-radius: 6px; font-family: var(--font-s);
+      font-size: 0.75rem; padding: 0.5rem; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+    .main { margin-left: 220px; padding: 2rem; min-height: 100vh; }
+
+    /* ── TABS ── */
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── PAGE HEADER ── */
+    .page-header { margin-bottom: 2rem; }
+    .page-title   { font-family: var(--font-d); font-size: 1.8rem; color: var(--text); }
+    .page-sub     { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.3rem; }
+
+    /* ── STATS ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.2rem 1.4rem;
+    }
+    .stat-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .stat-value { font-family: var(--font-d); font-size: 2rem; color: var(--gold); line-height: 1; }
+    .stat-desc  { font-size: 0.72rem; color: var(--text-dim); margin-top: 0.3rem; }
+
+    /* ── TABLE ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border);
+    }
+    .card-title { font-weight: 600; font-size: 0.9rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; font-size: 0.68rem; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--text-dim);
+      padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--border);
+    }
+    td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ── BADGE ── */
+    .badge {
+      display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px;
+      font-size: 0.65rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .badge-active  { background: rgba(76,175,125,0.15); color: var(--green); }
+    .badge-pending { background: rgba(201,168,76,0.15); color: var(--gold); }
+    .badge-expired { background: rgba(255,255,255,0.05); color: var(--text-dim); }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.45rem 0.9rem; border-radius: 6px; font-family: var(--font-s);
+      font-size: 0.75rem; font-weight: 500; cursor: pointer; border: none;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.8; }
+    .btn-gold  { background: var(--gold); color: #0D0F14; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+    .btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .btn-danger { background: rgba(224,82,82,0.15); color: var(--red); border: 1px solid rgba(224,82,82,0.2); }
+    .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.7rem; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      z-index: 1000; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto; padding: 2rem;
+      animation: modalIn 0.25s ease;
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .modal-title { font-family: var(--font-d); font-size: 1.3rem; margin-bottom: 0.3rem; }
+    .modal-sub   { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 1.5rem; }
+    .modal-footer { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-family: var(--font-s); font-size: 0.85rem;
+      padding: 0.65rem 0.9rem; outline: none; transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--gold); }
+    .form-group select { background: var(--surface2); }
+    .form-group select option { background: var(--surface2); }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .form-full { grid-column: 1 / -1; }
+
+    /* ── LINK CLIENT ── */
+    .link-box {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.6rem 0.9rem; margin-top: 1rem;
+    }
+    .link-url { flex: 1; font-size: 0.78rem; color: var(--blue); word-break: break-all; }
+
+    /* ── EMPTY ── */
+    .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-dim); }
+    .empty-icon  { font-size: 2.5rem; margin-bottom: 1rem; }
+    .empty-title { font-size: 0.9rem; color: var(--text); margin-bottom: 0.3rem; }
+    .empty-desc  { font-size: 0.8rem; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.9rem 1.3rem;
+      font-size: 0.85rem; min-width: 220px;
+      transform: translateY(20px); opacity: 0;
+      transition: all 0.3s; pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: rgba(76,175,125,0.4); color: var(--green); }
+    #toast.error   { border-color: rgba(224,82,82,0.4);  color: var(--red); }
+
+    /* ── RESPONSIVE ── */
+    @media(max-width: 768px) {
+      .sidebar { width: 60px; }
+      .sidebar-logo p, .nav-label, .admin-info, .btn-logout { display: none; }
+      .nav-item { padding: 0.8rem; justify-content: center; }
+      .main { margin-left: 60px; padding: 1rem; }
+      .modal-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ LOGIN ═══════════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">✦ Undangan Digital</div>
+    <p class="login-sub">Admin Dashboard</p>
+    <div class="form-field">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="admin@email.com" />
+    </div>
+    <div class="form-field">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <button class="btn-primary" onclick="doLogin()" id="login-btn">Masuk</button>
+    <p class="login-error" id="login-error"></p>
+  </div>
+</div>
+
+<!-- ═══════════════════════ APP ═══════════════════════ -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>✦ Undangan</h1>
+      <p class="nav-label">Master Admin</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showTab('dashboard')">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-item" onclick="showTab('clients')">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Klien</span>
+      </div>
+      <div class="nav-item" onclick="showTab('templates')">
+        <span class="nav-icon">🎨</span>
+        <span class="nav-label">Template</span>
+      </div>
+      <div class="nav-item" onclick="showTab('settings')">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Pengaturan</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <div class="admin-avatar" id="admin-avatar">A</div>
+        <div class="admin-info">
+          <div class="admin-name" id="admin-name-display">Admin</div>
+          <div class="admin-role">Master Admin</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">⏻ Keluar</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TAB: DASHBOARD -->
+    <div class="tab-pane active" id="tab-dashboard">
+      <div class="page-header">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-sub">Selamat datang! Berikut ringkasan bisnismu.</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Klien</div>
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-desc">terdaftar</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Aktif</div>
+          <div class="stat-value" id="stat-active" style="color:var(--green)">—</div>
+          <div class="stat-desc">undangan live</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value" id="stat-pending" style="color:var(--gold)">—</div>
+          <div class="stat-desc">belum dikonfigurasi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Bulan Ini</div>
+          <div class="stat-value" id="stat-month" style="color:var(--blue)">—</div>
+          <div class="stat-desc">klien baru</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Klien Terbaru</span>
+          <button class="btn btn-ghost btn-sm" onclick="showTab('clients')">Lihat Semua →</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Klien</th>
+              <th>Paket</th>
+              <th>Status</th>
+              <th>Tanggal Nikah</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="recent-clients-tbody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:2rem">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: CLIENTS -->
+    <div class="tab-pane" id="tab-clients">
+      <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <h1 class="page-title">Manajemen Klien</h1>
+          <p class="page-sub">Kelola semua klien dan undangan mereka.</p>
+        </div>
+        <button class="btn btn-gold" onclick="openAddClient()">＋ Tambah Klien</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Semua Klien</span>
+          <input type="text" placeholder="Cari klien..." id="search-client" oninput="filterClients()"
+            style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:0.4rem 0.8rem;font-family:var(--font-s);font-size:0.8rem;outline:none;width:200px"/>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Nama Pasangan</th>
+              <th>Email Login</th>
+              <th>Paket</th>
+              <th>Status</th>
+              <th>Tanggal Nikah</th>
+              <th>Link Undangan</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="clients-tbody">
+            <tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:2rem">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: TEMPLATES -->
+    <div class="tab-pane" id="tab-templates">
+      <div class="page-header">
+        <h1 class="page-title">Template</h1>
+        <p class="page-sub">Kelola tema undangan yang tersedia.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.5rem">
+        <div class="card" style="overflow:visible">
+          <div style="height:140px;background:linear-gradient(135deg,#0A0A0A,#1a1a1a);border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem">✦</div>
+          <div style="padding:1.2rem">
+            <div style="font-weight:600;margin-bottom:0.3rem">Elegant Gold</div>
+            <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:1rem">Tema emas & hitam mewah</div>
+            <span class="badge badge-active">Aktif</span>
+          </div>
+        </div>
+        <div class="card" style="overflow:visible;opacity:0.5">
+          <div style="height:140px;background:linear-gradient(135deg,#FFF5F5,#FFE0E0);border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem">🌸</div>
+          <div style="padding:1.2rem">
+            <div style="font-weight:600;margin-bottom:0.3rem">Soft Romantic</div>
+            <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:1rem">Dusty pink & floral</div>
+            <span class="badge badge-pending">Coming Soon</span>
+          </div>
+        </div>
+        <div class="card" style="overflow:visible;opacity:0.5">
+          <div style="height:140px;background:linear-gradient(135deg,#F8F8F8,#EEEEEE);border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem">◻</div>
+          <div style="padding:1.2rem">
+            <div style="font-weight:600;margin-bottom:0.3rem">Modern Minimal</div>
+            <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:1rem">Clean & contemporary</div>
+            <span class="badge badge-pending">Coming Soon</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SETTINGS -->
+    <div class="tab-pane" id="tab-settings">
+      <div class="page-header">
+        <h1 class="page-title">Pengaturan</h1>
+        <p class="page-sub">Konfigurasi akun dan sistem.</p>
+      </div>
+      <div class="card" style="max-width:500px;padding:1.5rem">
+        <div class="card-title" style="margin-bottom:1.5rem">Ganti Password Admin</div>
+        <div class="form-group">
+          <label>Password Baru</label>
+          <input type="password" id="new-password" placeholder="Min. 8 karakter"/>
+        </div>
+        <div class="form-group">
+          <label>Konfirmasi Password</label>
+          <input type="password" id="confirm-password" placeholder="Ulangi password"/>
+        </div>
+        <button class="btn btn-gold" onclick="changePassword()">Simpan Password</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ MODAL: TAMBAH KLIEN ═══ -->
+<div class="modal-overlay" id="modal-add-client">
+  <div class="modal">
+    <div class="modal-title">Tambah Klien Baru</div>
+    <p class="modal-sub">Buat akun klien dan konfigurasikan undangan mereka.</p>
+    <div class="modal-grid">
+      <div class="form-group form-full">
+        <label>Email Login Klien *</label>
+        <input type="email" id="nc-email" placeholder="klien@email.com"/>
+      </div>
+      <div class="form-group form-full">
+        <label>Password Awal *</label>
+        <input type="text" id="nc-password" placeholder="Akan dikirim ke klien" value="undangan123"/>
+      </div>
+      <div class="form-group">
+        <label>Nama Panggilan Pria *</label>
+        <input type="text" id="nc-groom" placeholder="Budi"/>
+      </div>
+      <div class="form-group">
+        <label>Nama Panggilan Wanita *</label>
+        <input type="text" id="nc-bride" placeholder="Sari"/>
+      </div>
+      <div class="form-group">
+        <label>Tanggal Pernikahan *</label>
+        <input type="date" id="nc-date"/>
+      </div>
+      <div class="form-group">
+        <label>Paket</label>
+        <select id="nc-package">
+          <option value="basic">Basic — Rp 100.000</option>
+          <option value="standard" selected>Standard — Rp 250.000</option>
+          <option value="premium">Premium — Rp 450.000</option>
+        </select>
+      </div>
+      <div class="form-group form-full">
+        <label>Catatan Internal</label>
+        <textarea id="nc-notes" placeholder="Catatan untuk dirimu sendiri..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-client')">Batal</button>
+      <button class="btn btn-gold" onclick="addClient()" id="btn-add-client">Buat Klien</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: DETAIL KLIEN ═══ -->
+<div class="modal-overlay" id="modal-client-detail">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-title" id="detail-title">Detail Klien</div>
+    <p class="modal-sub" id="detail-sub"></p>
+    <div id="detail-link-box"></div>
+    <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+      <button class="btn btn-gold" id="btn-edit-client">✏️ Edit Data Undangan</button>
+      <button class="btn btn-ghost" id="btn-open-invitation">🔗 Buka Undangan</button>
+      <button class="btn btn-ghost" id="btn-open-client-dash">👤 Masuk sebagai Klien</button>
+      <button class="btn btn-danger btn-sm" id="btn-delete-client">🗑 Hapus</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-client-detail')">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: EDIT UNDANGAN ═══ -->
+<div class="modal-overlay" id="modal-edit-invitation">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">Edit Data Undangan</div>
+    <p class="modal-sub" id="edit-inv-sub">Isi data undangan klien.</p>
+    <input type="hidden" id="edit-client-id"/>
+
+    <!-- Tab navigasi dalam modal -->
+    <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;overflow-x:auto;padding-bottom:0.3rem">
+      <button class="btn btn-gold btn-sm" onclick="switchEditTab('mempelai')" id="etab-mempelai">👫 Mempelai</button>
+      <button class="btn btn-ghost btn-sm" onclick="switchEditTab('acara')" id="etab-acara">📅 Acara</button>
+      <button class="btn btn-ghost btn-sm" onclick="switchEditTab('lovestory')" id="etab-lovestory">💕 Love Story</button>
+      <button class="btn btn-ghost btn-sm" onclick="switchEditTab('amplop')" id="etab-amplop">💰 Amplop</button>
+    </div>
+
+    <!-- Mempelai -->
+    <div id="editpane-mempelai">
+      <div class="modal-grid">
+        <div class="form-group"><label>Nama Panggilan Pria</label><input id="e-groomNickname" type="text"/></div>
+        <div class="form-group"><label>Nama Panggilan Wanita</label><input id="e-brideNickname" type="text"/></div>
+        <div class="form-group"><label>Nama Lengkap Pria</label><input id="e-groomFullName" type="text"/></div>
+        <div class="form-group"><label>Nama Lengkap Wanita</label><input id="e-brideFullName" type="text"/></div>
+        <div class="form-group"><label>Ayah Pria</label><input id="e-groomFather" type="text"/></div>
+        <div class="form-group"><label>Ibu Pria</label><input id="e-groomMother" type="text"/></div>
+        <div class="form-group"><label>Ayah Wanita</label><input id="e-brideFather" type="text"/></div>
+        <div class="form-group"><label>Ibu Wanita</label><input id="e-brideMother" type="text"/></div>
+        <div class="form-group"><label>Instagram Pria</label><input id="e-groomInstagram" type="text" placeholder="@username"/></div>
+        <div class="form-group"><label>Instagram Wanita</label><input id="e-brideInstagram" type="text" placeholder="@username"/></div>
+        <div class="form-group"><label>Foto Pria (URL)</label><input id="e-groomPhoto" type="text" placeholder="https://..."/></div>
+        <div class="form-group"><label>Foto Wanita (URL)</label><input id="e-bridePhoto" type="text" placeholder="https://..."/></div>
+        <div class="form-group form-full"><label>Pesan Cover</label><input id="e-coverMessage" type="text"/></div>
+        <div class="form-group form-full"><label>Nama Tamu (default)</label><input id="e-guestName" type="text" placeholder="Nama Tamu Undangan"/></div>
+        <div class="form-group form-full"><label>Tanggal Pernikahan</label><input id="e-weddingDate" type="datetime-local"/></div>
+      </div>
+    </div>
+
+    <!-- Acara -->
+    <div id="editpane-acara" style="display:none">
+      <div style="font-size:0.75rem;font-weight:600;color:var(--gold);margin-bottom:1rem;letter-spacing:0.1em">AKAD NIKAH</div>
+      <div class="modal-grid">
+        <div class="form-group"><label>Hari</label><input id="e-akadDay" type="text" placeholder="Sabtu"/></div>
+        <div class="form-group"><label>Tanggal (teks)</label><input id="e-akadDate" type="text" placeholder="20 September 2025"/></div>
+        <div class="form-group form-full"><label>Jam</label><input id="e-akadTime" type="text" placeholder="09.00 – 11.00 WIB"/></div>
+        <div class="form-group form-full"><label>Nama Venue</label><input id="e-akadVenue" type="text"/></div>
+        <div class="form-group form-full"><label>Alamat</label><input id="e-akadAddress" type="text"/></div>
+        <div class="form-group form-full"><label>Google Maps URL</label><input id="e-akadMaps" type="text"/></div>
+      </div>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--gold);margin:1.5rem 0 1rem;letter-spacing:0.1em">RESEPSI</div>
+      <div class="modal-grid">
+        <div class="form-group"><label>Hari</label><input id="e-resepsiDay" type="text" placeholder="Sabtu"/></div>
+        <div class="form-group"><label>Tanggal (teks)</label><input id="e-resepsiDate" type="text"/></div>
+        <div class="form-group form-full"><label>Jam</label><input id="e-resepsiTime" type="text"/></div>
+        <div class="form-group form-full"><label>Nama Venue</label><input id="e-resepsiVenue" type="text"/></div>
+        <div class="form-group form-full"><label>Alamat</label><input id="e-resepsiAddress" type="text"/></div>
+        <div class="form-group form-full"><label>Google Maps URL</label><input id="e-resepsiMaps" type="text"/></div>
+        <div class="form-group form-full"><label>Maps Embed URL</label><input id="e-mapsEmbed" type="text" placeholder="Dari tombol Embed Google Maps"/></div>
+        <div class="form-group form-full"><label>Nama Venue Utama</label><input id="e-venueMainName" type="text"/></div>
+      </div>
+    </div>
+
+    <!-- Love Story -->
+    <div id="editpane-lovestory" style="display:none">
+      <div id="love-story-editor"></div>
+      <button class="btn btn-ghost btn-sm" onclick="addLoveStoryItem()" style="margin-top:0.5rem">＋ Tambah Momen</button>
+    </div>
+
+    <!-- Amplop -->
+    <div id="editpane-amplop" style="display:none">
+      <div id="bank-editor"></div>
+      <button class="btn btn-ghost btn-sm" onclick="addBankItem()" style="margin-top:0.5rem">＋ Tambah Rekening</button>
+      <div style="margin-top:1.5rem">
+        <div class="form-group"><label>URL Gambar QRIS</label><input id="e-qrisImage" type="text" placeholder="https://..."/></div>
+        <div class="form-group"><label>Nama QRIS</label><input id="e-qrisName" type="text"/></div>
+      </div>
+      <div class="form-group" style="margin-top:1rem"><label>URL Musik (MP3)</label><input id="e-musicUrl" type="text" placeholder="https://drive.google.com/uc?..."/></div>
+      <div class="form-group"><label>URL Apps Script (RSVP)</label><input id="e-appsScriptUrl" type="text"/></div>
+      <div class="form-group"><label>URL Sheets CSV (Ucapan)</label><input id="e-sheetsPublicUrl" type="text"/></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-invitation')">Batal</button>
+      <button class="btn btn-gold" onclick="saveInvitation()" id="btn-save-inv">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// INIT SUPABASE
+// ═══════════════════════════════════════════
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentUser = null;
+let allClients  = [];
+let editTarget  = null;
+
+// ═══════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn   = document.getElementById('login-btn');
+
+  errEl.textContent = '';
+  btn.disabled = true; btn.textContent = 'Masuk...';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+
+  if (error || !data.user) {
+    errEl.textContent = 'Email atau password salah.';
+    btn.disabled = false; btn.textContent = 'Masuk';
+    return;
+  }
+
+  // Cek apakah ini admin
+  if (data.user.email !== ADMIN_EMAIL) {
+    await sb.auth.signOut();
+    errEl.textContent = 'Akun ini bukan Master Admin.';
+    btn.disabled = false; btn.textContent = 'Masuk';
+    return;
+  }
+
+  currentUser = data.user;
+  initApp();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+async function changePassword() {
+  const np = document.getElementById('new-password').value;
+  const cp = document.getElementById('confirm-password').value;
+  if (np !== cp) { showToast('Password tidak sama!', 'error'); return; }
+  if (np.length < 8) { showToast('Min. 8 karakter!', 'error'); return; }
+  const { error } = await sb.auth.updateUser({ password: np });
+  if (error) showToast('Gagal: ' + error.message, 'error');
+  else showToast('Password berhasil diubah!', 'success');
+}
+
+// Check session on load
+sb.auth.onAuthStateChange((event, session) => {
+  if (session?.user?.email === ADMIN_EMAIL) {
+    currentUser = session.user;
+    initApp();
+  }
+});
+
+// ═══════════════════════════════════════════
+// APP INIT
+// ═══════════════════════════════════════════
+function initApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const name = currentUser.email.split('@')[0];
+  document.getElementById('admin-name-display').textContent = name;
+  document.getElementById('admin-avatar').textContent = name[0].toUpperCase();
+  loadClients();
+}
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick')?.includes(name)) n.classList.add('active');
+  });
+}
+
+// ═══════════════════════════════════════════
+// LOAD CLIENTS
+// ═══════════════════════════════════════════
+async function loadClients() {
+  const { data, error } = await sb.from('clients').select('*').order('created_at', { ascending: false });
+  if (error) { showToast('Gagal memuat data: ' + error.message, 'error'); return; }
+  allClients = data || [];
+  renderStats();
+  renderClientsTable(allClients);
+  renderRecentClients();
+}
+
+function renderStats() {
+  const now   = new Date();
+  const month = now.getMonth();
+  const year  = now.getFullYear();
+  const active  = allClients.filter(c => c.status === 'active').length;
+  const pending = allClients.filter(c => c.status === 'pending').length;
+  const thisMonth = allClients.filter(c => {
+    const d = new Date(c.created_at);
+    return d.getMonth() === month && d.getFullYear() === year;
+  }).length;
+  document.getElementById('stat-total').textContent   = allClients.length;
+  document.getElementById('stat-active').textContent  = active;
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-month').textContent   = thisMonth;
+}
+
+function renderClientsTable(clients) {
+  const tbody = document.getElementById('clients-tbody');
+  if (!clients.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Belum ada klien</div><div class="empty-desc">Klik "+ Tambah Klien" untuk mulai</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = clients.map(c => `
+    <tr>
+      <td style="font-weight:500">${c.groom_nickname || '—'} & ${c.bride_nickname || '—'}</td>
+      <td style="color:var(--text-dim);font-size:0.8rem">${c.client_email || '—'}</td>
+      <td><span style="font-size:0.75rem;color:var(--gold)">${packageLabel(c.package)}</span></td>
+      <td><span class="badge badge-${c.status || 'pending'}">${statusLabel(c.status)}</span></td>
+      <td style="color:var(--text-dim);font-size:0.8rem">${c.wedding_date ? formatDate(c.wedding_date) : '—'}</td>
+      <td>
+        ${c.slug ? `<a href="../undangan/${c.slug}/" target="_blank" style="color:var(--blue);font-size:0.75rem">${c.slug}</a>` : '<span style="color:var(--text-dim);font-size:0.75rem">—</span>'}
+      </td>
+      <td style="display:flex;gap:0.4rem">
+        <button class="btn btn-ghost btn-sm" onclick="openClientDetail('${c.id}')">Detail</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEditInvitation('${c.id}')">✏️</button>
+      </td>
+    </tr>`).join('');
+}
+
+function renderRecentClients() {
+  const recent = allClients.slice(0, 5);
+  const tbody  = document.getElementById('recent-clients-tbody');
+  if (!recent.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:2rem">Belum ada klien</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = recent.map(c => `
+    <tr>
+      <td style="font-weight:500">${c.groom_nickname || '—'} & ${c.bride_nickname || '—'}</td>
+      <td><span style="font-size:0.75rem;color:var(--gold)">${packageLabel(c.package)}</span></td>
+      <td><span class="badge badge-${c.status || 'pending'}">${statusLabel(c.status)}</span></td>
+      <td style="color:var(--text-dim);font-size:0.8rem">${c.wedding_date ? formatDate(c.wedding_date) : '—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openClientDetail('${c.id}')">Detail</button></td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// ADD CLIENT
+// ═══════════════════════════════════════════
+function openAddClient() {
+  document.getElementById('nc-email').value    = '';
+  document.getElementById('nc-password').value = 'undangan123';
+  document.getElementById('nc-groom').value    = '';
+  document.getElementById('nc-bride').value    = '';
+  document.getElementById('nc-date').value     = '';
+  document.getElementById('nc-notes').value    = '';
+  openModal('modal-add-client');
+}
+
+async function addClient() {
+  const email   = document.getElementById('nc-email').value.trim();
+  const pass    = document.getElementById('nc-password').value.trim();
+  const groom   = document.getElementById('nc-groom').value.trim();
+  const bride   = document.getElementById('nc-bride').value.trim();
+  const date    = document.getElementById('nc-date').value;
+  const pkg     = document.getElementById('nc-package').value;
+  const notes   = document.getElementById('nc-notes').value.trim();
+  const btn     = document.getElementById('btn-add-client');
+
+  if (!email || !pass || !groom || !bride) { showToast('Isi semua field wajib!', 'error'); return; }
+
+  btn.disabled = true; btn.textContent = 'Membuat...';
+
+  // Buat akun Supabase Auth
+  const { data: authData, error: authErr } = await sb.auth.admin
+    ? await createClientAuth(email, pass)
+    : { data: null, error: { message: 'Admin API tidak tersedia di client side' } };
+
+  // Simpan data ke tabel clients (tanpa perlu Auth sukses dulu)
+  const slug = `${groom.toLowerCase()}-${bride.toLowerCase()}-${Date.now()}`.replace(/[^a-z0-9-]/g,'');
+  const { data, error } = await sb.from('clients').insert({
+    client_email:   email,
+    groom_nickname: groom,
+    bride_nickname: bride,
+    wedding_date:   date || null,
+    package:        pkg,
+    notes:          notes,
+    status:         'pending',
+    slug:           slug,
+    invitation_data: {}
+  }).select().single();
+
+  if (error) { showToast('Gagal: ' + error.message, 'error'); btn.disabled = false; btn.textContent = 'Buat Klien'; return; }
+
+  showToast(`Klien "${groom} & ${bride}" berhasil dibuat!`, 'success');
+  closeModal('modal-add-client');
+  btn.disabled = false; btn.textContent = 'Buat Klien';
+  loadClients();
+}
+
+// ═══════════════════════════════════════════
+// CLIENT DETAIL
+// ═══════════════════════════════════════════
+function openClientDetail(id) {
+  const c = allClients.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('detail-title').textContent = `${c.groom_nickname || '—'} & ${c.bride_nickname || '—'}`;
+  document.getElementById('detail-sub').textContent   = `${c.client_email} · ${packageLabel(c.package)} · ${statusLabel(c.status)}`;
+  document.getElementById('detail-link-box').innerHTML = c.slug ? `
+    <div class="link-box">
+      <span class="link-url">🔗 undangan/${c.slug}/</span>
+      <button class="btn btn-ghost btn-sm" onclick="copyText('${window.location.origin}/undangan/${c.slug}/')">Salin</button>
+    </div>` : `<p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.5rem">Slug belum tersedia.</p>`;
+  document.getElementById('btn-edit-client').onclick   = () => { closeModal('modal-client-detail'); openEditInvitation(id); };
+  document.getElementById('btn-open-invitation').onclick = () => window.open(`../undangan/${c.slug}/`, '_blank');
+  document.getElementById('btn-open-client-dash').onclick = () => window.open(`../client/?id=${c.id}`, '_blank');
+  document.getElementById('btn-delete-client').onclick  = () => deleteClient(id);
+  openModal('modal-client-detail');
+}
+
+async function deleteClient(id) {
+  if (!confirm('Hapus klien ini? Tindakan tidak bisa dibatalkan.')) return;
+  const { error } = await sb.from('clients').delete().eq('id', id);
+  if (error) { showToast('Gagal hapus: ' + error.message, 'error'); return; }
+  showToast('Klien berhasil dihapus.', 'success');
+  closeModal('modal-client-detail');
+  loadClients();
+}
+
+// ═══════════════════════════════════════════
+// EDIT INVITATION DATA
+// ═══════════════════════════════════════════
+function openEditInvitation(id) {
+  const c = allClients.find(x => x.id === id);
+  if (!c) return;
+  editTarget = c;
+  const inv  = c.invitation_data || {};
+  document.getElementById('edit-client-id').value  = id;
+  document.getElementById('edit-inv-sub').textContent = `${c.groom_nickname} & ${c.bride_nickname}`;
+
+  // Mempelai
+  setVal('e-groomNickname',  inv.groomNickname  || c.groom_nickname || '');
+  setVal('e-brideNickname',  inv.brideNickname  || c.bride_nickname || '');
+  setVal('e-groomFullName',  inv.groomFullName  || '');
+  setVal('e-brideFullName',  inv.brideFullName  || '');
+  setVal('e-groomFather',    inv.groomFather    || '');
+  setVal('e-groomMother',    inv.groomMother    || '');
+  setVal('e-brideFather',    inv.brideFather    || '');
+  setVal('e-brideMother',    inv.brideMother    || '');
+  setVal('e-groomInstagram', inv.groomInstagram || '');
+  setVal('e-brideInstagram', inv.brideInstagram || '');
+  setVal('e-groomPhoto',     inv.groomPhoto     || '');
+  setVal('e-bridePhoto',     inv.bridePhoto     || '');
+  setVal('e-coverMessage',   inv.coverMessage   || 'Bersama keluarga kami mengundang kehadiran Anda');
+  setVal('e-guestName',      inv.guestName      || 'Nama Tamu Undangan');
+  setVal('e-weddingDate',    (inv.weddingDate || c.wedding_date || '').replace('Z','').substring(0,16));
+
+  // Acara
+  const akad = inv.akad || {};
+  setVal('e-akadDay',     akad.day     || '');
+  setVal('e-akadDate',    akad.date    || '');
+  setVal('e-akadTime',    akad.time    || '');
+  setVal('e-akadVenue',   akad.venue   || '');
+  setVal('e-akadAddress', akad.address || '');
+  setVal('e-akadMaps',    akad.mapsUrl || '');
+  const res = inv.resepsi || {};
+  setVal('e-resepsiDay',     res.day     || '');
+  setVal('e-resepsiDate',    res.date    || '');
+  setVal('e-resepsiTime',    res.time    || '');
+  setVal('e-resepsiVenue',   res.venue   || '');
+  setVal('e-resepsiAddress', res.address || '');
+  setVal('e-resepsiMaps',    res.mapsUrl || '');
+  setVal('e-mapsEmbed',      inv.mapsEmbed     || '');
+  setVal('e-venueMainName',  inv.venueMainName || '');
+
+  // Love story
+  buildLoveStoryEditor(inv.loveStory || []);
+
+  // Amplop
+  buildBankEditor((inv.amplop || {}).banks || []);
+  setVal('e-qrisImage',       (inv.amplop || {}).qrisImage  || '');
+  setVal('e-qrisName',        (inv.amplop || {}).qrisName   || '');
+  setVal('e-musicUrl',        inv.musicUrl        || '');
+  setVal('e-appsScriptUrl',   inv.appsScriptUrl   || '');
+  setVal('e-sheetsPublicUrl', inv.sheetsPublicUrl || '');
+
+  switchEditTab('mempelai');
+  openModal('modal-edit-invitation');
+}
+
+async function saveInvitation() {
+  const id  = document.getElementById('edit-client-id').value;
+  const btn = document.getElementById('btn-save-inv');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+  const loveStory = collectLoveStory();
+  const banks     = collectBanks();
+
+  const inv = {
+    groomNickname:  getVal('e-groomNickname'),
+    brideNickname:  getVal('e-brideNickname'),
+    groomFullName:  getVal('e-groomFullName'),
+    brideFullName:  getVal('e-brideFullName'),
+    groomFather:    getVal('e-groomFather'),
+    groomMother:    getVal('e-groomMother'),
+    brideFather:    getVal('e-brideFather'),
+    brideMother:    getVal('e-brideMother'),
+    groomInstagram: getVal('e-groomInstagram'),
+    brideInstagram: getVal('e-brideInstagram'),
+    groomPhoto:     getVal('e-groomPhoto'),
+    bridePhoto:     getVal('e-bridePhoto'),
+    coverMessage:   getVal('e-coverMessage'),
+    guestName:      getVal('e-guestName'),
+    weddingDate:    getVal('e-weddingDate'),
+    mapsEmbed:      getVal('e-mapsEmbed'),
+    venueMainName:  getVal('e-venueMainName'),
+    musicUrl:       getVal('e-musicUrl'),
+    appsScriptUrl:  getVal('e-appsScriptUrl'),
+    sheetsPublicUrl:getVal('e-sheetsPublicUrl'),
+    akad: {
+      day: getVal('e-akadDay'), date: getVal('e-akadDate'),
+      time: getVal('e-akadTime'), venue: getVal('e-akadVenue'),
+      address: getVal('e-akadAddress'), mapsUrl: getVal('e-akadMaps')
+    },
+    resepsi: {
+      day: getVal('e-resepsiDay'), date: getVal('e-resepsiDate'),
+      time: getVal('e-resepsiTime'), venue: getVal('e-resepsiVenue'),
+      address: getVal('e-resepsiAddress'), mapsUrl: getVal('e-resepsiMaps')
+    },
+    loveStory,
+    amplop: {
+      banks,
+      qrisImage: getVal('e-qrisImage'),
+      qrisName:  getVal('e-qrisName')
+    }
+  };
+
+  const { error } = await sb.from('clients').update({
+    invitation_data: inv,
+    groom_nickname:  inv.groomNickname,
+    bride_nickname:  inv.brideNickname,
+    wedding_date:    inv.weddingDate || null,
+    status:          'active',
+    updated_at:      new Date().toISOString()
+  }).eq('id', id);
+
+  if (error) { showToast('Gagal simpan: ' + error.message, 'error'); }
+  else { showToast('Data berhasil disimpan!', 'success'); closeModal('modal-edit-invitation'); loadClients(); }
+
+  btn.disabled = false; btn.textContent = '💾 Simpan';
+}
+
+// ═══════════════════════════════════════════
+// LOVE STORY EDITOR
+// ═══════════════════════════════════════════
+function buildLoveStoryEditor(items) {
+  const container = document.getElementById('love-story-editor');
+  if (!items.length) items = [{ year: '', title: '', story: '' }];
+  container.innerHTML = items.map((item, i) => lsItemHTML(item, i)).join('');
+}
+function lsItemHTML(item, i) {
+  return `<div class="ls-item" style="background:var(--surface2);border-radius:8px;padding:1rem;margin-bottom:0.75rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+      <span style="font-size:0.7rem;color:var(--gold);font-weight:600">MOMEN ${i+1}</span>
+      <button class="btn btn-danger btn-sm" onclick="this.closest('.ls-item').remove()">✕</button>
+    </div>
+    <div class="modal-grid">
+      <div class="form-group"><label>Tahun</label><input type="text" class="ls-year" value="${item.year||''}"/></div>
+      <div class="form-group"><label>Judul</label><input type="text" class="ls-title" value="${item.title||''}"/></div>
+      <div class="form-group form-full"><label>Cerita</label><textarea class="ls-story" style="min-height:60px">${item.story||''}</textarea></div>
+    </div>
+  </div>`;
+}
+function addLoveStoryItem() {
+  const c = document.getElementById('love-story-editor');
+  const i = c.querySelectorAll('.ls-item').length;
+  c.insertAdjacentHTML('beforeend', lsItemHTML({}, i));
+}
+function collectLoveStory() {
+  return [...document.querySelectorAll('.ls-item')].map(el => ({
+    year: el.querySelector('.ls-year').value,
+    title: el.querySelector('.ls-title').value,
+    story: el.querySelector('.ls-story').value
+  }));
+}
+
+// ═══════════════════════════════════════════
+// BANK EDITOR
+// ═══════════════════════════════════════════
+function buildBankEditor(banks) {
+  const container = document.getElementById('bank-editor');
+  if (!banks.length) banks = [{ bank: '', name: '', number: '' }];
+  container.innerHTML = banks.map((b, i) => bankItemHTML(b, i)).join('');
+}
+function bankItemHTML(b, i) {
+  return `<div class="bank-item" style="background:var(--surface2);border-radius:8px;padding:1rem;margin-bottom:0.75rem">
+    <div style="display:flex;justify-content:space-between;margin-bottom:0.75rem">
+      <span style="font-size:0.7rem;color:var(--gold);font-weight:600">REKENING ${i+1}</span>
+      <button class="btn btn-danger btn-sm" onclick="this.closest('.bank-item').remove()">✕</button>
+    </div>
+    <div class="modal-grid">
+      <div class="form-group"><label>Nama Bank</label><input type="text" class="bank-name-bank" value="${b.bank||''}"/></div>
+      <div class="form-group"><label>Atas Nama</label><input type="text" class="bank-name" value="${b.name||''}"/></div>
+      <div class="form-group form-full"><label>Nomor Rekening</label><input type="text" class="bank-number" value="${b.number||''}"/></div>
+    </div>
+  </div>`;
+}
+function addBankItem() {
+  const c = document.getElementById('bank-editor');
+  const i = c.querySelectorAll('.bank-item').length;
+  c.insertAdjacentHTML('beforeend', bankItemHTML({}, i));
+}
+function collectBanks() {
+  return [...document.querySelectorAll('.bank-item')].map(el => ({
+    bank:   el.querySelector('.bank-name-bank').value,
+    name:   el.querySelector('.bank-name').value,
+    number: el.querySelector('.bank-number').value
+  }));
+}
+
+// ═══════════════════════════════════════════
+// EDIT TAB SWITCH
+// ═══════════════════════════════════════════
+const editPanes = ['mempelai','acara','lovestory','amplop'];
+function switchEditTab(name) {
+  editPanes.forEach(p => {
+    document.getElementById('editpane-' + p).style.display = p === name ? 'block' : 'none';
+    const btn = document.getElementById('etab-' + p);
+    btn.className = p === name ? 'btn btn-gold btn-sm' : 'btn btn-ghost btn-sm';
+  });
+}
+
+// ═══════════════════════════════════════════
+// FILTER
+// ═══════════════════════════════════════════
+function filterClients() {
+  const q = document.getElementById('search-client').value.toLowerCase();
+  const filtered = allClients.filter(c =>
+    (c.groom_nickname || '').toLowerCase().includes(q) ||
+    (c.bride_nickname || '').toLowerCase().includes(q) ||
+    (c.client_email   || '').toLowerCase().includes(q)
+  );
+  renderClientsTable(filtered);
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function setVal(id, v)  { const el = document.getElementById(id); if (el) el.value = v; }
+function getVal(id)     { const el = document.getElementById(id); return el ? el.value : ''; }
+function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('Link disalin!', 'success')); }
+function packageLabel(p) {
+  return p === 'basic' ? 'Basic' : p === 'premium' ? 'Premium' : 'Standard';
+}
+function statusLabel(s) {
+  return s === 'active' ? 'Aktif' : s === 'expired' ? 'Expired' : 'Pending';
+}
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3000);
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+</script>
+</body>
+</html>
