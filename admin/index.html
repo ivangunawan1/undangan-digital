@@ -782,12 +782,8 @@ async function addClient() {
 
   btn.disabled = true; btn.textContent = 'Membuat...';
 
-  // Buat akun Supabase Auth
-  const { data: authData, error: authErr } = await sb.auth.admin
-    ? await createClientAuth(email, pass)
-    : { data: null, error: { message: 'Admin API tidak tersedia di client side' } };
-
-  // Simpan data ke tabel clients (tanpa perlu Auth sukses dulu)
+  // Langsung simpan ke tabel clients
+  // (Akun login klien dibuat manual di Supabase Auth jika diperlukan)
   const slug = `${groom.toLowerCase()}-${bride.toLowerCase()}-${Date.now()}`.replace(/[^a-z0-9-]/g,'');
   const { data, error } = await sb.from('clients').insert({
     client_email:   email,
