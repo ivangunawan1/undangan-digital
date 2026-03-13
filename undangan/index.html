@@ -344,11 +344,10 @@
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// Ambil slug dari URL: undangan/[slug]/
-const slug = location.pathname.split('/').filter(Boolean).pop();
-
-// Ambil nama tamu dari query param: ?tamu=Budi
+// Ambil slug & nama tamu dari query param
+// URL format: /undangan/?id=budi-sari-123&tamu=Nama+Tamu
 const urlParams = new URLSearchParams(location.search);
+const slug      = urlParams.get('id') || '';
 const guestName = urlParams.get('tamu') || urlParams.get('guest') || 'Nama Tamu Undangan';
 
 async function loadInvitation() {
