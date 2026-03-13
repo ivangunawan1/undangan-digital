@@ -729,7 +729,7 @@ function renderClientsTable(clients) {
       <td><span class="badge badge-${c.status || 'pending'}">${statusLabel(c.status)}</span></td>
       <td style="color:var(--text-dim);font-size:0.8rem">${c.wedding_date ? formatDate(c.wedding_date) : '—'}</td>
       <td>
-        ${c.slug ? `<a href="../undangan/${c.slug}/" target="_blank" style="color:var(--blue);font-size:0.75rem">${c.slug}</a>` : '<span style="color:var(--text-dim);font-size:0.75rem">—</span>'}
+        ${c.slug ? `<a href="../undangan/?id=${c.slug}" target="_blank" style="color:var(--blue);font-size:0.75rem">${c.slug}</a>` : '<span style="color:var(--text-dim);font-size:0.75rem">—</span>'}
       </td>
       <td style="display:flex;gap:0.4rem">
         <button class="btn btn-ghost btn-sm" onclick="openClientDetail('${c.id}')">Detail</button>
@@ -815,11 +815,11 @@ function openClientDetail(id) {
   document.getElementById('detail-sub').textContent   = `${c.client_email} · ${packageLabel(c.package)} · ${statusLabel(c.status)}`;
   document.getElementById('detail-link-box').innerHTML = c.slug ? `
     <div class="link-box">
-      <span class="link-url">🔗 undangan/${c.slug}/</span>
-      <button class="btn btn-ghost btn-sm" onclick="copyText('${window.location.origin}/undangan/${c.slug}/')">Salin</button>
+      <span class="link-url">🔗 undangan/?id=${c.slug}</span>
+      <button class="btn btn-ghost btn-sm" onclick="copyText('${window.location.origin}/undangan/?id=${c.slug}')">Salin</button>
     </div>` : `<p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.5rem">Slug belum tersedia.</p>`;
   document.getElementById('btn-edit-client').onclick   = () => { closeModal('modal-client-detail'); openEditInvitation(id); };
-  document.getElementById('btn-open-invitation').onclick = () => window.open(`../undangan/${c.slug}/`, '_blank');
+  document.getElementById('btn-open-invitation').onclick = () => window.open(`../undangan/?id=${c.slug}`, '_blank');
   document.getElementById('btn-open-client-dash').onclick = () => window.open(`../client/?id=${c.id}`, '_blank');
   document.getElementById('btn-delete-client').onclick  = () => deleteClient(id);
   openModal('modal-client-detail');
