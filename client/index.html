@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Edit Undangan Saya</title>
+  <title>Dashboard Mempelai</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -257,21 +257,19 @@
     <div class="section-body" id="sec-acara">
       <div style="font-size:0.75rem;font-weight:600;color:var(--gold);margin-bottom:1rem">AKAD NIKAH</div>
       <div class="form-grid">
-        <div class="form-group"><label>Hari</label><input type="text" id="akadDay" placeholder="Sabtu"/></div>
-        <div class="form-group"><label>Tanggal (teks)</label><input type="text" id="akadDate" placeholder="20 September 2025"/></div>
-        <div class="form-group full"><label>Jam</label><input type="text" id="akadTime" placeholder="09.00 – 11.00 WIB"/></div>
+        <div class="form-group full"><label>Tanggal & Waktu Akad</label><input type="datetime-local" id="akadDateTime"/></div>
+        <div class="form-group full"><label>Jam (teks, contoh: 09.00 – 11.00 WIB)</label><input type="text" id="akadTime" placeholder="09.00 – 11.00 WIB"/></div>
         <div class="form-group full"><label>Nama Venue</label><input type="text" id="akadVenue"/></div>
         <div class="form-group full"><label>Alamat Lengkap</label><input type="text" id="akadAddress"/></div>
-        <div class="form-group full"><label>Link Google Maps</label><input type="text" id="akadMaps" placeholder="https://maps.google.com/?q=..."/></div>
+        <div class="form-group full"><label>Link Google Maps</label><input type="text" id="akadMaps" placeholder="https://maps.app.goo.gl/..."/></div>
       </div>
       <div style="font-size:0.75rem;font-weight:600;color:var(--gold);margin:1.5rem 0 1rem">RESEPSI</div>
       <div class="form-grid">
-        <div class="form-group"><label>Hari</label><input type="text" id="resepsiDay"/></div>
-        <div class="form-group"><label>Tanggal (teks)</label><input type="text" id="resepsiDate"/></div>
-        <div class="form-group full"><label>Jam</label><input type="text" id="resepsiTime"/></div>
+        <div class="form-group full"><label>Tanggal & Waktu Resepsi</label><input type="datetime-local" id="resepsiDateTime"/></div>
+        <div class="form-group full"><label>Jam (teks, contoh: 11.00 – 14.00 WIB)</label><input type="text" id="resepsiTime"/></div>
         <div class="form-group full"><label>Nama Venue</label><input type="text" id="resepsiVenue"/></div>
         <div class="form-group full"><label>Alamat Lengkap</label><input type="text" id="resepsiAddress"/></div>
-        <div class="form-group full"><label>Link Google Maps</label><input type="text" id="resepsiMaps"/></div>
+        <div class="form-group full"><label>Link Google Maps</label><input type="text" id="resepsiMaps" placeholder="https://maps.app.goo.gl/..."/></div>
         <div class="form-group full"><label>Google Maps Embed URL</label><input type="text" id="mapsEmbed"/>
           <p class="form-hint">Dari Google Maps → Share → Embed a map → salin URL di src="..."</p>
         </div>
@@ -402,11 +400,20 @@ async function doLogin() {
 
 async function doLogout() {
   await sb.auth.signOut();
-  location.reload();
+  currentUser = null; clientData = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').textContent = '';
 }
 
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user && session.user.email !== ADMIN_EMAIL) {
+  if (event === 'SIGNED_OUT') {
+    currentUser = null; clientData = null;
+    return;
+  }
+  if (session?.user && session.user.email !== ADMIN_EMAIL && !clientData) {
     currentUser = session.user;
     await loadClientData();
   }
@@ -443,7 +450,7 @@ function initApp() {
   document.getElementById('banner-desc').textContent  = clientData.status === 'active'
     ? 'Undanganmu sudah live! Edit data dan klik Simpan.'
     : 'Lengkapi data di bawah. Admin akan mengaktifkan undanganmu.';
-  document.getElementById('btn-preview').onclick = () => window.open(`../undangan/${clientData.slug}/`, '_blank');
+  document.getElementById('btn-preview').onclick = () => window.open(`../undangan/?id=${clientData.slug}`, '_blank');
 
   fillForm(inv);
 }
@@ -460,11 +467,11 @@ function fillForm(inv) {
   set('weddingDate',   (inv.weddingDate||'').replace('Z','').substring(0,16));
 
   const ak = inv.akad || {};
-  set('akadDay', ak.day); set('akadDate', ak.date); set('akadTime', ak.time);
+  set('akadDateTime', ak.datetime || ''); set('akadTime', ak.time);
   set('akadVenue', ak.venue); set('akadAddress', ak.address); set('akadMaps', ak.mapsUrl);
 
   const re = inv.resepsi || {};
-  set('resepsiDay', re.day); set('resepsiDate', re.date); set('resepsiTime', re.time);
+  set('resepsiDateTime', re.datetime || ''); set('resepsiTime', re.time);
   set('resepsiVenue', re.venue); set('resepsiAddress', re.address); set('resepsiMaps', re.mapsUrl);
   set('mapsEmbed', inv.mapsEmbed);
 
@@ -494,8 +501,16 @@ async function saveData() {
     weddingDate: g('weddingDate'),
     mapsEmbed: g('mapsEmbed'),
     musicUrl: g('musicUrl'),
-    akad: { day: g('akadDay'), date: g('akadDate'), time: g('akadTime'), venue: g('akadVenue'), address: g('akadAddress'), mapsUrl: g('akadMaps') },
-    resepsi: { day: g('resepsiDay'), date: g('resepsiDate'), time: g('resepsiTime'), venue: g('resepsiVenue'), address: g('resepsiAddress'), mapsUrl: g('resepsiMaps') },
+    akad: (() => {
+      const dt = g('akadDateTime');
+      const d = dt ? new Date(dt) : null;
+      return { datetime: dt, day: d ? d.toLocaleDateString('id-ID',{weekday:'long'}) : '', date: d ? d.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '', time: g('akadTime'), venue: g('akadVenue'), address: g('akadAddress'), mapsUrl: g('akadMaps') };
+    })(),
+    resepsi: (() => {
+      const dt = g('resepsiDateTime');
+      const d = dt ? new Date(dt) : null;
+      return { datetime: dt, day: d ? d.toLocaleDateString('id-ID',{weekday:'long'}) : '', date: d ? d.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '', time: g('resepsiTime'), venue: g('resepsiVenue'), address: g('resepsiAddress'), mapsUrl: g('resepsiMaps') };
+    })(),
     loveStory: collectLS(),
     gallery: collectGallery(),
     amplop: { banks: collectBanks(), qrisImage: g('qrisImage'), qrisName: g('qrisName') },
