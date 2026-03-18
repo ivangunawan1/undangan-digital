@@ -304,7 +304,6 @@
     <p class="section-label">Konfirmasi Kehadiran</p><h2 class="section-title">RSVP &amp; Ucapan</h2>
     <div class="gold-line"><span class="gold-line-icon">✦</span></div>
     <form class="rsvp-form" id="rsvp-form" onsubmit="submitRSVP(event)">
-      <div class="form-group"><label class="form-label">Nama Lengkap *</label><input class="form-input" type="text" id="rsvp-name" required/></div>
       <div class="form-group"><label class="form-label">Kehadiran *</label>
         <select class="form-select" id="rsvp-attend" required>
           <option value="">-- Pilih --</option>
@@ -313,13 +312,7 @@
           <option value="Masih dipertimbangkan">? Masih dipertimbangkan</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Jumlah Tamu</label>
-        <select class="form-select" id="rsvp-guests">
-          <option value="1">1 orang</option><option value="2">2 orang</option>
-          <option value="3">3 orang</option><option value="4">4 orang</option>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">Ucapan &amp; Doa</label><textarea class="form-textarea" id="rsvp-message"></textarea></div>
+      <div class="form-group"><label class="form-label">Ucapan &amp; Doa</label><textarea class="form-textarea" id="rsvp-message" placeholder="Tulis ucapan dan doa untuk kedua mempelai..."></textarea></div>
       <button class="btn-submit" type="submit" id="rsvp-submit">Kirim Konfirmasi</button>
       <p id="rsvp-status" style="text-align:center;margin-top:1rem;font-family:var(--font-serif);color:var(--gold);font-style:italic;min-height:1.5rem;"></p>
     </form>
@@ -483,25 +476,21 @@ function startCountdown(dateStr) {
 
 async function submitRSVP(e) {
   e.preventDefault();
-  const btn = document.getElementById('rsvp-submit');
+  const btn    = document.getElementById('rsvp-submit');
   const status = document.getElementById('rsvp-status');
   btn.disabled = true; btn.textContent = 'Mengirim...';
 
-  const name    = document.getElementById('rsvp-name').value;
   const attend  = document.getElementById('rsvp-attend').value;
-  const guests  = parseInt(document.getElementById('rsvp-guests').value) || 1;
   const message = document.getElementById('rsvp-message').value;
+  const name    = guestName; // dari URL param ?tamu=
 
-  const { error } = await sb.from('rsvp').insert({ slug, name, attend, guests, message });
+  const { error } = await sb.from('rsvp').insert({ slug, name, attend, guests: 1, message });
 
   if (error) {
     status.textContent = '⚠ Gagal mengirim, coba lagi.';
   } else {
-    // Update rsvp_status di tabel guests kalau nama cocok
-    await sb.from('guests')
-      .update({ rsvp_status: attend })
-      .ilike('name', name);
-
+    // Update rsvp_status di tabel guests berdasarkan nama persis
+    await sb.from('guests').update({ rsvp_status: attend }).ilike('name', name);
     status.textContent = '✓ Konfirmasi berhasil dikirim! Terima kasih.';
     document.getElementById('rsvp-form').reset();
     setTimeout(() => loadWishes(), 1500);
