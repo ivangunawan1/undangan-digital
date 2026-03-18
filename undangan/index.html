@@ -425,7 +425,8 @@ function renderAll(C, raw) {
   if (C.mapsEmbed) document.getElementById('maps-iframe').src = C.mapsEmbed;
   setEl('maps-venue-name', C.venueMainName || '');
   const mLink = document.getElementById('maps-gmaps-link');
-  if (C.mapsUrl) mLink.href = C.mapsUrl; else mLink.style.display='none';
+  const mapsUrl = C.akad?.mapsUrl || C.resepsi?.mapsUrl || C.mapsUrl || '';
+  if (mapsUrl) { mLink.href = mapsUrl; } else { mLink.style.display='none'; }
 
   // Love story
   const lsContainer = document.getElementById('love-story-timeline');
@@ -459,10 +460,8 @@ function renderAll(C, raw) {
     document.getElementById('music-player').style.display = 'block';
   }
 
-  // RSVP
-  if (C.sheetsPublicUrl) loadWishes(C.sheetsPublicUrl);
-  window._appsScriptUrl   = C.appsScriptUrl   || '';
-  window._sheetsPublicUrl = C.sheetsPublicUrl  || '';
+  // RSVP - load ucapan dari Supabase
+  loadWishes();
 }
 
 // ════════════════════════════════════════
@@ -484,28 +483,42 @@ function startCountdown(dateStr) {
 
 async function submitRSVP(e) {
   e.preventDefault();
-  const url = window._appsScriptUrl;
   const btn = document.getElementById('rsvp-submit');
   const status = document.getElementById('rsvp-status');
-  if (!url) { status.textContent = '⚠ RSVP belum dikonfigurasi.'; return; }
   btn.disabled = true; btn.textContent = 'Mengirim...';
-  await fetch(url, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name: document.getElementById('rsvp-name').value, attend: document.getElementById('rsvp-attend').value, guests: document.getElementById('rsvp-guests').value, message: document.getElementById('rsvp-message').value }) });
-  status.textContent = '✓ Konfirmasi berhasil dikirim!';
-  document.getElementById('rsvp-form').reset();
-  setTimeout(() => { if(window._sheetsPublicUrl) loadWishes(window._sheetsPublicUrl); }, 2000);
+
+  const { error } = await sb.from('rsvp').insert({
+    slug,
+    name:    document.getElementById('rsvp-name').value,
+    attend:  document.getElementById('rsvp-attend').value,
+    guests:  parseInt(document.getElementById('rsvp-guests').value) || 1,
+    message: document.getElementById('rsvp-message').value
+  });
+
+  if (error) {
+    status.textContent = '⚠ Gagal mengirim, coba lagi.';
+  } else {
+    status.textContent = '✓ Konfirmasi berhasil dikirim! Terima kasih.';
+    document.getElementById('rsvp-form').reset();
+    setTimeout(() => loadWishes(), 1500);
+  }
   btn.disabled = false; btn.textContent = 'Kirim Konfirmasi';
 }
 
-async function loadWishes(url) {
+async function loadWishes() {
   const c = document.getElementById('wishes-container');
-  try {
-    const res = await fetch(url); const text = await res.text();
-    const rows = text.split('\n').slice(1).filter(r => r.trim()).reverse().slice(0,20);
-    if (!rows.length) { c.innerHTML = '<p style="text-align:center;color:rgba(201,168,76,0.3)">Belum ada ucapan.</p>'; return; }
-    c.innerHTML = rows.map(row => { const cols = row.split(','); return `<div class="wish-item"><p class="wish-name">${sanitize(cols[1])}</p><p class="wish-attend">${sanitize(cols[2])} · ${cols[3]||''} tamu</p><p class="wish-message">${sanitize(cols[4])||'—'}</p></div>`; }).join('');
-  } catch { c.innerHTML = '<p style="text-align:center;color:rgba(250,246,238,0.2)">—</p>'; }
+  const { data, error } = await sb.from('rsvp').select('*').eq('slug', slug).order('created_at', { ascending: false }).limit(20);
+  if (error || !data?.length) {
+    c.innerHTML = '<p style="text-align:center;color:rgba(201,168,76,0.3)">Belum ada ucapan.</p>';
+    return;
+  }
+  c.innerHTML = data.map(r => `
+    <div class="wish-item">
+      <p class="wish-name">${sanitize(r.name)}</p>
+      <p class="wish-attend">${sanitize(r.attend||'')} · ${r.guests||1} tamu</p>
+      <p class="wish-message">${sanitize(r.message)||'—'}</p>
+    </div>`).join('');
 }
-
 function sanitize(s) { return (s||'').replace(/"/g,'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function openLightbox(src) { document.getElementById('lb-img').src=src; document.getElementById('lightbox').classList.add('active'); }
 function closeLightbox() { document.getElementById('lightbox').classList.remove('active'); }
@@ -523,7 +536,12 @@ function toggleMusic() {
 function openInvitation() {
   document.getElementById('cover').classList.add('opened');
   const audio = document.getElementById('audio');
-  if (audio.src && audio.src !== location.href) { audio.play().catch(()=>{}); document.getElementById('music-btn').textContent='♬'; document.getElementById('music-btn').classList.add('playing'); musicPlaying=true; }
+  if (audio.src && audio.src !== location.href) {
+    audio.play().catch(()=>{});
+    document.getElementById('music-btn').textContent='♬';
+    document.getElementById('music-btn').classList.add('playing');
+    musicPlaying = true;
+  }
 }
 
 // Scroll reveal
