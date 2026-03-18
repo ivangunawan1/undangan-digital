@@ -487,17 +487,21 @@ async function submitRSVP(e) {
   const status = document.getElementById('rsvp-status');
   btn.disabled = true; btn.textContent = 'Mengirim...';
 
-  const { error } = await sb.from('rsvp').insert({
-    slug,
-    name:    document.getElementById('rsvp-name').value,
-    attend:  document.getElementById('rsvp-attend').value,
-    guests:  parseInt(document.getElementById('rsvp-guests').value) || 1,
-    message: document.getElementById('rsvp-message').value
-  });
+  const name    = document.getElementById('rsvp-name').value;
+  const attend  = document.getElementById('rsvp-attend').value;
+  const guests  = parseInt(document.getElementById('rsvp-guests').value) || 1;
+  const message = document.getElementById('rsvp-message').value;
+
+  const { error } = await sb.from('rsvp').insert({ slug, name, attend, guests, message });
 
   if (error) {
     status.textContent = '⚠ Gagal mengirim, coba lagi.';
   } else {
+    // Update rsvp_status di tabel guests kalau nama cocok
+    await sb.from('guests')
+      .update({ rsvp_status: attend })
+      .ilike('name', name);
+
     status.textContent = '✓ Konfirmasi berhasil dikirim! Terima kasih.';
     document.getElementById('rsvp-form').reset();
     setTimeout(() => loadWishes(), 1500);
