@@ -535,13 +535,24 @@ function toggleMusic() {
 
 function openInvitation() {
   document.getElementById('cover').classList.add('opened');
-  const audio = document.getElementById('audio');
-  if (audio.src && audio.src !== location.href) {
-    audio.play().catch(()=>{});
-    document.getElementById('music-btn').textContent='♬';
-    document.getElementById('music-btn').classList.add('playing');
-    musicPlaying = true;
-  }
+  setTimeout(() => {
+    const audio = document.getElementById('audio');
+    const btn   = document.getElementById('music-btn');
+    if (!audio || !btn) return;
+    const tryPlay = () => {
+      audio.play().then(() => {
+        btn.textContent = '♬';
+        btn.classList.add('playing');
+        musicPlaying = true;
+      }).catch(() => {});
+    };
+    if (audio.readyState >= 2) {
+      tryPlay();
+    } else {
+      audio.addEventListener('canplay', tryPlay, { once: true });
+      audio.load();
+    }
+  }, 300);
 }
 
 // Scroll reveal
